@@ -295,7 +295,7 @@ class PDFProcessor {
 
     // Markdown formatting
     formatMarkdown(text) {
-        return text
+        let formattedText = text
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
             .replace(/^### (.+$)/gm, '<h3>$1</h3>')
@@ -308,6 +308,14 @@ class PDFProcessor {
             .replace(/<p><\/p>/g, '')
             .replace(/<p>(<h[1-6]>)/g, '$1')
             .replace(/(<\/h[1-6]>)<\/p>/g, '$1');
+        
+        // Add clickable title functionality
+        formattedText = formattedText.replace(
+            /<strong>Título:<\/strong>\s*(.+?)(?=<\/p>|<br>|$)/g,
+            '<strong>Título:</strong> <span class="clickable-title" onclick="copyTitleToClipboard(this)" title="Clique para copiar o título">$1</span>'
+        );
+        
+        return formattedText;
     }
 
     // Export functions
@@ -730,10 +738,26 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// Global function for copying title to clipboard
+window.copyTitleToClipboard = function(element) {
+    const titleText = element.textContent.trim();
+    navigator.clipboard.writeText(titleText).then(() => {
+        // Find the PDFProcessor instance to show toast
+        if (window.pdfProcessorInstance) {
+            window.pdfProcessorInstance.showToast('Título copiado para a área de transferência!');
+        }
+    }).catch(error => {
+        console.error('Erro ao copiar título:', error);
+        if (window.pdfProcessorInstance) {
+            window.pdfProcessorInstance.showToast('Erro ao copiar título', 'error');
+        }
+    });
+};
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        new PDFProcessor();
+        window.pdfProcessorInstance = new PDFProcessor();
     } catch (error) {
         console.error('Erro ao inicializar PDFProcessor:', error);
     }

@@ -550,6 +550,23 @@ body {
     opacity: 0.8;
 }
 
+/* Clickable title styles */
+.clickable-title {
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+.clickable-title:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.clickable-title:active {
+    color: #1f5f8b;
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
     .container {
