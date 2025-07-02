@@ -5,7 +5,6 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const session = require('express-session');
 require('dotenv').config();
 
@@ -18,6 +17,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // Middleware
 app.use(express.static('public'));
+app.use('/assets', express.static('assets')); // Adicionar esta linha
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
@@ -215,64 +215,24 @@ app.post('/upload', requireAuth, upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'Não foi possível extrair texto do PDF' });
     }
 
-    // Prompt para o Gemini Pro
-    const prompt = `
-Você é um assistente de IA especializado em analisar e resumir documentos técnicos e científicos. Analise o texto PDF fornecido e extraia as seguintes informações:
+    // Obter tipo de resumo selecionado
+    const summaryType = req.body.summaryType || 'informativo';
 
-**PRIMEIRA PARTE - METADADOS DO DOCUMENTO:**
-Extraia e identifique (quando disponível):
-- **Título:** Título completo do documento
-- **Autores:** Nome(s) do(s) autor(es)
-- **Instituição/Afiliação:** Universidade, empresa ou instituição dos autores
-- **Local de Publicação:** Cidade, país
-- **Revista/Journal:** Nome da revista, periódico ou conferência
-- **Volume:** Número do volume da publicação
-- **Número/Issue:** Número da edição ou issue
-- **Ano de Publicação:** Ano de publicação
-- **Mês de Publicação:** Mês de publicação (se disponível)
-- **Data de Recebimento:** Data em que o artigo foi recebido (Received)
-- **Data de Aceitação:** Data em que o artigo foi aceito (Accepted)
-- **Páginas:** Intervalo de páginas do artigo
-- **DOI/ISBN:** Identificador digital (se disponível)
-- **Palavras-chave:** Palavras-chave principais do documento
+    // Definir prompts específicos para cada tipo de resumo
+    const prompts = {
+      'informativo': `Analise o seguinte texto extraído de um PDF e gere um RESUMO INFORMATIVO detalhado que inclua objetivos, métodos, resultados e conclusões. O resumo deve permitir ao leitor entender o conteúdo sem consultar o original.`,
+      'critico': `Analise o seguinte texto extraído de um PDF e gere um RESUMO CRÍTICO que inclua não apenas os pontos principais, mas também sua análise crítica, opinião fundamentada e avaliação do conteúdo apresentado.`,
+      'indicativo': `Analise o seguinte texto extraído de um PDF e gere um RESUMO INDICATIVO que apresente apenas os pontos principais e temas abordados, sem detalhar dados específicos ou resultados.`,
+      'estruturado': `Analise o seguinte texto extraído de um PDF e gere um RESUMO ESTRUTURADO dividido nas seguintes seções: **Contextualização**, **Objetivo**, **Método**, **Resultados** e **Conclusão**.`,
+      'expandido': `Analise o seguinte texto extraído de um PDF e gere um RESUMO EXPANDIDO detalhado que inclua introdução, objetivos, métodos, resultados parciais, discussão e conclusões. Pode ser mais extenso que um resumo tradicional.`,
+      'corrido': `Analise o seguinte texto extraído de um PDF e gere um RESUMO CORRIDO em texto único, sem divisões ou subtítulos, que seja claro, objetivo e inclua todas as informações essenciais.`,
+      'fichamento': `Analise o seguinte texto extraído de um PDF e gere um FICHAMENTO que destaque pontos-chave, conceitos importantes, referências relevantes e facilite consultas rápidas ao material.`,
+      'topicos': `Analise o seguinte texto extraído de um PDF e gere um RESUMO EM TÓPICOS organizando as informações em uma lista clara dos principais pontos, conceitos e conclusões.`
+    };
 
-**SEGUNDA PARTE - RESUMO ESTRUTURADO:**
-Gere um resumo conciso e informativo seguindo esta estrutura (se aplicável):
-- **Introdução:** Tema principal e objetivo
-- **Metodologia/Abordagem:** Métodos e técnicas utilizadas
-- **Resultados/Descobertas Principais:** Achados relevantes e conclusões primárias
-- **Discussão/Implicações:** Significado dos resultados, implicações e limitações
-- **Conclusão:** Sumário dos pontos importantes e impacto geral
+    const basePrompt = prompts[summaryType] || prompts['informativo'];
 
-**Instruções de Formatação:**
-- Use formato Markdown com títulos em negrito
-- Para metadados não encontrados, use "Não identificado"
-- Mantenha o resumo entre 300-500 palavras
-- Use linguagem formal, clara e objetiva
-- Procure especialmente por informações como "VOLUME 63 | NUMBER 3 | SEPTEMBER 2008 | Received, October 30, 2007. Accepted, April 21, 2008" no cabeçalho ou rodapé
-
-**Texto do Documento:**
-${pdfText}
-
-**Formato de Saída Esperado:**
-## METADADOS DO DOCUMENTO
-**Título:** [título]
-**Autores:** [autores]
-**Instituição:** [instituição]
-**Local:** [local]
-**Revista/Journal:** [revista]
-**Volume:** [volume]
-**Número:** [número]
-**Ano:** [ano]
-**Mês:** [mês]
-**Data de Recebimento:** [data recebimento]
-**Data de Aceitação:** [data aceitação]
-**Páginas:** [páginas]
-**DOI/ISBN:** [doi]
-**Palavras-chave:** [palavras-chave]
-
-## RESUMO
-[resumo estruturado conforme solicitado]`;
+    const prompt = `${basePrompt}\n\nFormate a resposta em Markdown seguindo esta estrutura:\n\n**Título:** [Título do documento]\n**Autor(es):** [Autor(es) se identificado]\n**Tipo de Resumo:** ${summaryType.charAt(0).toUpperCase() + summaryType.slice(1)}\n\n## Resumo\n\n[Conteúdo do resumo baseado no tipo selecionado]\n\n## Palavras-chave\n[3-5 palavras-chave principais]\n\nTexto para análise:\n${pdfText}`;
 
     // Gerar resumo com Gemini Pro
     const result = await model.generateContent(prompt);
@@ -322,4 +282,55 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
   console.log('Certifique-se de configurar sua GEMINI_API_KEY no arquivo .env');
+});
+
+// Rate limiting variables
+let requestCount = 0;
+let lastResetTime = Date.now();
+const DAILY_LIMIT = 45; // Deixe uma margem de segurança
+const RESET_INTERVAL = 24 * 60 * 60 * 1000; // 24 horas
+
+// Function to check rate limit
+function checkRateLimit() {
+    const now = Date.now();
+    
+    // Reset counter if 24 hours have passed
+    if (now - lastResetTime > RESET_INTERVAL) {
+        requestCount = 0;
+        lastResetTime = now;
+    }
+    
+    return requestCount < DAILY_LIMIT;
+}
+
+// Modify your PDF processing endpoint
+app.post('/process-pdf', upload.single('pdf'), async (req, res) => {
+    try {
+        // Check rate limit before processing
+        if (!checkRateLimit()) {
+            return res.status(429).json({
+                error: 'Limite diário de processamento atingido. Tente novamente amanhã.',
+                resetTime: new Date(lastResetTime + RESET_INTERVAL).toISOString()
+            });
+        }
+        
+        // ... existing code ...
+        
+        // Increment counter after successful request
+        requestCount++;
+        
+        const result = await generateContent(/* your parameters */);
+        
+        // ... existing code ...
+        
+    } catch (error) {
+        if (error.message.includes('429') || error.message.includes('quota')) {
+            return res.status(429).json({
+                error: 'Limite de API atingido. Tente novamente mais tarde.',
+                retryAfter: 60 // seconds
+            });
+        }
+        
+        // ... existing error handling ...
+    }
 });

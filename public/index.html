@@ -8,13 +8,32 @@
     <link href="style.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-content">
-                <div class="header-title">
-                    <h1><i class="fas fa-book-open"></i> EstudAI</h1>
-                    <p>Transforme seus PDFs em resumos inteligentes com IA</p>
+    <!-- Novo Header com largura total -->
+    <header class="main-header">
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <i class="fas fa-mountain nav-logo"></i>
+                    <span class="brand-text">EstudAI</span>
                 </div>
+                
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">HOME</a>
+                    </li>
+                  
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">CONTATO</a>
+                    </li>
+                </ul>
+                
+                <div class="nav-social">
+                    <a href="#" class="social-icon"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="social-icon"><i class="fab fa-youtube"></i></a>
+                </div>
+                
                 <div class="user-info">
                     <div class="user-welcome">
                         <span id="userName">Carregando...</span>
@@ -23,9 +42,26 @@
                         </button>
                     </div>
                 </div>
+                
+                <div class="mobile-menu-toggle" id="mobileMenuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
             </div>
-        </header>
+        </nav>
+        
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-subtitle">Descubra o poder</h1>
+                <h2 class="hero-title">EstudAI</h2>
+                <p class="hero-description">Transforme seus PDFs em resumos inteligentes com IA</p>
+            </div>
+        </div>
+    </header>
 
+    <div class="container">
         <main class="main-content">
             <div class="upload-section">
                 <div class="upload-area" id="uploadArea">
@@ -44,10 +80,89 @@
                     <div class="file-details">
                         <i class="fas fa-file-pdf"></i>
                         <span class="file-name" id="fileName"></span>
+                        <div class="selected-type-info" id="selectedTypeInfo" style="display: none;">
+                            <span class="type-badge" id="typeBadge">
+                                <i class="fas fa-info-circle" id="typeBadgeIcon"></i>
+                                <span id="typeBadgeText">Informativo</span>
+                            </span>
+                        </div>
                         <button class="remove-file" id="removeFile">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
+                    
+                    <!-- Substituir a seção de seleção de tipo de resumo -->
+                    <div class="summary-types-section" id="summaryTypesSection" style="display: none;">
+                        <h3><i class="fas fa-store"></i> Escolha o Tipo de Resumo</h3>
+                        <div class="summary-types-grid">
+                            <div class="summary-card" data-type="informativo">
+                                <div class="card-icon">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <h4>Informativo</h4>
+                                <div class="card-badge">Recomendado</div>
+                            </div>
+                            
+                            <div class="summary-card" data-type="critico">
+                                <div class="card-icon">
+                                    <i class="fas fa-search"></i>
+                                </div>
+                                <h4>Crítico</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="indicativo">
+                                <div class="card-icon">
+                                    <i class="fas fa-compass"></i>
+                                </div>
+                                <h4>Indicativo</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="estruturado">
+                                <div class="card-icon">
+                                    <i class="fas fa-sitemap"></i>
+                                </div>
+                                <h4>Estruturado</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="expandido">
+                                <div class="card-icon">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </div>
+                                <h4>Expandido</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="corrido">
+                                <div class="card-icon">
+                                    <i class="fas fa-align-left"></i>
+                                </div>
+                                <h4>Corrido</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="fichamento">
+                                <div class="card-icon">
+                                    <i class="fas fa-bookmark"></i>
+                                </div>
+                                <h4>Fichamento</h4>
+                            </div>
+                            
+                            <div class="summary-card" data-type="topicos">
+                                <div class="card-icon">
+                                    <i class="fas fa-list-ul"></i>
+                                </div>
+                                <h4>Tópicos</h4>
+                            </div>
+                        </div>
+                        
+                        <div class="selected-summary-info" id="selectedSummaryInfo" style="display: none;">
+                            <div class="selected-card-preview" id="selectedCardPreview">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="selected-card-details">
+                                <h4 id="selectedCardTitle">Informativo</h4>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button class="process-btn" id="processBtn">
                         <i class="fas fa-magic"></i> Gerar Resumo
                     </button>
@@ -85,6 +200,10 @@
             <div class="result-section" id="resultSection" style="display: none;">
                 <div class="result-header">
                     <h2><i class="fas fa-file-alt"></i> Resumo Gerado</h2>
+                    <div class="summary-type-display" id="summaryTypeDisplay">
+                        <span class="type-label">Tipo:</span>
+                        <span class="type-value" id="summaryTypeValue">Informativo</span>
+                    </div>
                     <div class="result-actions">
                         <button class="copy-btn" id="copyBtn">
                             <i class="fas fa-copy"></i> Copiar
@@ -125,7 +244,44 @@
         </main>
 
         <footer class="footer">
-            <p>Powered by <strong>Gemini AI - Alekcey Colione</strong> | EstudAI &copy; 2025</p>
+            <div class="footer-content">
+              
+                <div class="footer-section">
+                    <div class="footer-brand">
+                        <h3><i class="fas fa-book-open"></i> EstudAI</h3>
+                        <p>EstudAI é uma agência digital especializada em transformar PDFs em resumos inteligentes com IA, localizada no Brasil.</p>
+                    </div>
+                </div>
+                
+                <div class="footer-section footer-section-center">
+                    <h4>Empresa<br><br></h4>
+                    <ul>
+                        <li><a href="#">Sobre</a></li>
+                        <li><a href="#">Web Design</a></li>
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#">Contato</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <div class="footer-bottom-content">
+                    <div class="footer-info">
+                        <p><i class="fas fa-map-marker-alt"></i> Av Brasil, 990 - Balsa Nova, PR - Brasil</p>
+                        <p><i class="fas fa-envelope"></i> contato@inovai.me</p>
+                        <p><i class="fas fa-phone"></i> +55 (41) 98806-3446</p>
+                    </div>
+                    <p class="copyright">Copyright EstudAI © 2025 | Powered by <strong>Gemini AI - Alekcey Colione</strong></p>
+                </div>
+            </div>
         </footer>
     </div>
 

@@ -3,22 +3,42 @@ class PDFProcessor {
         this.selectedFile = null;
         this.currentSummary = '';
         this.currentFilename = '';
+        this.selectedSummaryType = 'informativo';
         
         this.initializeElements();
         this.attachEventListeners();
         this.checkAuthStatus();
+        this.initializeDefaultSelection();
     }
-
+    
     initializeElements() {
         // Elementos principais
         this.uploadArea = document.getElementById('uploadArea');
         this.fileInput = document.getElementById('fileInput');
         this.uploadBtn = document.getElementById('uploadBtn');
-        
         this.fileInfo = document.getElementById('fileInfo');
         this.fileName = document.getElementById('fileName');
-        this.removeFile = document.getElementById('removeFile');
+        this.fileSize = document.getElementById('fileSize');
+        this.removeFileBtn = document.getElementById('removeFileBtn');
         this.processBtn = document.getElementById('processBtn');
+        this.loading = document.getElementById('loading');
+        this.resultSection = document.getElementById('resultSection');
+        this.resultContent = document.getElementById('resultContent');
+        this.summaryTypeValue = document.getElementById('summaryTypeValue');
+        this.summaryTypesSection = document.getElementById('summaryTypesSection');
+        
+        // Novos elementos para exibir tipo selecionado no topo com ícone
+        this.selectedTypeInfo = document.getElementById('selectedTypeInfo');
+        this.typeBadge = document.getElementById('typeBadge');
+        this.typeBadgeIcon = document.getElementById('typeBadgeIcon');
+        this.typeBadgeText = document.getElementById('typeBadgeText');
+        
+        // Elementos para cards de tipo de resumo
+        this.summaryCards = document.querySelectorAll('.summary-card');
+        this.selectedSummaryInfo = document.getElementById('selectedSummaryInfo');
+        this.selectedCardPreview = document.getElementById('selectedCardPreview');
+        this.selectedCardTitle = document.getElementById('selectedCardTitle');
+        this.selectedCardDescription = document.getElementById('selectedCardDescription');
         
         // Estados da aplicação
         this.loading = document.getElementById('loading');
@@ -82,6 +102,16 @@ class PDFProcessor {
         this.removeFile?.addEventListener('click', () => this.removeSelectedFile());
         this.processBtn?.addEventListener('click', () => this.processFile());
         
+        // Summary type cards
+        console.log('Anexando event listeners aos cards:', this.summaryCards.length);
+        this.summaryCards.forEach((card, index) => {
+            console.log(`Card ${index}:`, card.dataset.type);
+            card.addEventListener('click', () => {
+                console.log('Card clicado:', card.dataset.type);
+                this.selectSummaryCard(card);
+            });
+        });
+        
         // Result actions
         this.copyBtn?.addEventListener('click', () => this.copyToClipboard());
         this.exportPdfBtn?.addEventListener('click', () => this.exportToPdf());
@@ -103,20 +133,82 @@ class PDFProcessor {
         document.addEventListener('click', (e) => this.handleOutsideClick(e));
     }
 
-    // Drag and Drop handlers
+    // Método para inicializar seleção padrão
+    initializeDefaultSelection() {
+        const defaultCard = document.querySelector('.summary-card[data-type="informativo"]');
+        if (defaultCard) {
+            this.selectSummaryCard(defaultCard);
+        }
+    }
+
+    // Método para selecionar card de tipo de resumo
+    selectSummaryCard(selectedCard) {
+        console.log('Selecionando card:', selectedCard.dataset.type);
+        
+        // Remove seleção anterior
+        this.summaryCards.forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Adiciona seleção ao card clicado
+        selectedCard.classList.add('selected');
+        
+        // Atualiza o tipo selecionado
+        this.selectedSummaryType = selectedCard.dataset.type;
+        console.log('Tipo selecionado:', this.selectedSummaryType);
+        
+        // Atualiza a informação do card selecionado
+        this.updateSelectedSummaryInfo(selectedCard);
+    }
+
+    // Método para atualizar informações do resumo selecionado
+    updateSelectedSummaryInfo(card) {
+        const icon = card.querySelector('.card-icon i').className;
+        const title = card.querySelector('h4').textContent;
+        
+        console.log('Atualizando info:', { icon, title });
+        
+        // Atualiza o badge no topo com ícone e texto
+        if (this.typeBadgeIcon) {
+            this.typeBadgeIcon.className = icon;
+        }
+        if (this.typeBadgeText) {
+            this.typeBadgeText.textContent = title;
+        }
+        if (this.selectedTypeInfo) {
+            this.selectedTypeInfo.style.display = 'block';
+        }
+        
+        if (this.selectedCardPreview) {
+            this.selectedCardPreview.innerHTML = `<i class="${icon}"></i>`;
+        }
+        
+        if (this.selectedCardTitle) {
+            this.selectedCardTitle.textContent = title;
+        }
+        
+        // Mostra a seção de informações
+        if (this.selectedSummaryInfo) {
+            this.selectedSummaryInfo.style.display = 'block';
+            console.log('Mostrando selected summary info');
+        }
+    }
+
+    // Drag and drop handlers
     handleDragOver(e) {
         e.preventDefault();
-        this.uploadArea.classList.add('dragover');
+        this.uploadArea.classList.add('drag-over');
     }
 
     handleDragLeave(e) {
         e.preventDefault();
-        this.uploadArea.classList.remove('dragover');
+        this.uploadArea.classList.remove('drag-over');
     }
 
     handleDrop(e) {
         e.preventDefault();
-        this.uploadArea.classList.remove('dragover');
+        this.uploadArea.classList.remove('drag-over');
+        
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             this.handleFile(files[0]);
@@ -132,66 +224,124 @@ class PDFProcessor {
     }
 
     handleFile(file) {
-        // Validate file type
         if (file.type !== 'application/pdf') {
             this.showError('Por favor, selecione apenas arquivos PDF.');
             return;
         }
 
-        // Validate file size (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            this.showError('O arquivo é muito grande. Máximo permitido: 10MB.');
+        if (file.size > 10 * 1024 * 1024) { // 10MB
+            this.showError('O arquivo é muito grande. Tamanho máximo: 10MB.');
             return;
         }
 
         this.selectedFile = file;
         this.showFileInfo(file);
+        this.hideError();
     }
 
     showFileInfo(file) {
         this.fileName.textContent = file.name;
-        this.uploadArea.style.display = 'none';
         this.fileInfo.style.display = 'block';
-        this.hideError();
+        this.uploadArea.style.display = 'none';
+        
+        // ADICIONAR ESTAS LINHAS:
+        if (this.summaryTypesSection) {
+            this.summaryTypesSection.style.display = 'block';
+        }
     }
 
     removeSelectedFile() {
         this.selectedFile = null;
-        this.fileInput.value = '';
-        this.uploadArea.style.display = 'block';
         this.fileInfo.style.display = 'none';
+        this.uploadArea.style.display = 'block';
+        this.fileInput.value = '';
+        
+        // Esconde o tipo selecionado no topo
+        if (this.selectedTypeInfo) {
+            this.selectedTypeInfo.style.display = 'none';
+        }
+        
+        // ADICIONAR ESTAS LINHAS:
+        if (this.summaryTypesSection) {
+            this.summaryTypesSection.style.display = 'none';
+        }
+        if (this.selectedSummaryInfo) {
+            this.selectedSummaryInfo.style.display = 'none';
+        }
     }
 
-    // Progress control methods
-    updateProgress(step, percentage, message) {
-        // Atualiza a barra de progresso
+    // Progress and loading
+    showLoading() {
+        this.loading.style.display = 'block';
+        this.fileInfo.style.display = 'none';
+        this.errorSection.style.display = 'none';
+        this.resultSection.style.display = 'none';
+    }
+
+    hideLoading() {
+        this.loading.style.display = 'none';
+    }
+
+    updateProgress(step, percentage, text) {
+        this.loadingText.textContent = text;
         this.progressFill.style.width = percentage + '%';
         
-        // Atualiza o texto de loading
-        this.loadingText.textContent = message;
-        
-        // Remove classes anteriores
+        // Reset all steps
         [this.step1, this.step2, this.step3, this.step4].forEach(stepEl => {
             stepEl.classList.remove('active', 'completed');
         });
         
-        // Marca etapas completadas
+        // Mark completed steps
         for (let i = 1; i < step; i++) {
-            this[`step${i}`].classList.add('completed');
+            const stepEl = this[`step${i}`];
+            if (stepEl) stepEl.classList.add('completed');
         }
         
-        // Marca etapa atual
-        if (step <= 4) {
-            this[`step${step}`].classList.add('active');
-        }
+        // Mark current step
+        const currentStep = this[`step${step}`];
+        if (currentStep) currentStep.classList.add('active');
     }
-    
+
     resetProgress() {
         this.progressFill.style.width = '0%';
-        this.loadingText.textContent = 'Processando seu PDF e gerando resumo...';
         [this.step1, this.step2, this.step3, this.step4].forEach(stepEl => {
             stepEl.classList.remove('active', 'completed');
         });
+    }
+
+    // Results and errors
+    showResult(summary, filename) {
+        this.currentSummary = summary;
+        this.currentFilename = filename;
+        this.resultContent.innerHTML = this.formatMarkdown(summary);
+        
+        // Atualiza o tipo de resumo exibido
+        if (this.summaryTypeValue) {
+            const typeNames = {
+                'informativo': 'Informativo',
+                'critico': 'Crítico',
+                'indicativo': 'Indicativo',
+                'estruturado': 'Estruturado',
+                'expandido': 'Expandido',
+                'corrido': 'Corrido',
+                'fichamento': 'Fichamento',
+                'topicos': 'Tópicos'
+            };
+            this.summaryTypeValue.textContent = typeNames[this.selectedSummaryType] || this.selectedSummaryType;
+        }
+        
+        this.hideLoading();
+        this.resultSection.style.display = 'block';
+    }
+
+    showError(message) {
+        this.errorMessage.textContent = message;
+        this.errorSection.style.display = 'block';
+        this.hideLoading();
+    }
+
+    hideError() {
+        this.errorSection.style.display = 'none';
     }
 
     // File processing
@@ -210,6 +360,7 @@ class PDFProcessor {
 
         const formData = new FormData();
         formData.append('pdf', this.selectedFile);
+        formData.append('summaryType', this.selectedSummaryType || 'informativo');
 
         try {
             // Etapa 2: Enviando para o servidor
@@ -239,83 +390,20 @@ class PDFProcessor {
             this.showError(error.message || 'Erro ao processar o arquivo. Tente novamente.');
         }
     }
-    
-    // Utility method for delays
+
+    // Utility functions
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // UI State management
-    showLoading() {
-        this.fileInfo.style.display = 'none';
-        this.resultSection.style.display = 'none';
-        this.errorSection.style.display = 'none';
-        this.loading.style.display = 'block';
-        this.resetProgress();
-    }
-
-    showResult(summary, filename) {
-        this.loading.style.display = 'none';
-        this.resultContent.innerHTML = this.formatMarkdown(summary);
-        this.resultSection.style.display = 'block';
-        this.currentSummary = summary;
-        this.currentFilename = filename;
-    }
-
-    showError(message) {
-        this.loading.style.display = 'none';
-        this.fileInfo.style.display = 'none';
-        this.resultSection.style.display = 'none';
-        this.errorMessage.textContent = message;
-        this.errorSection.style.display = 'block';
-    }
-
-    hideError() {
-        this.errorSection.style.display = 'none';
-    }
-
-    resetApp() {
-        this.selectedFile = null;
-        this.fileInput.value = '';
-        this.uploadArea.style.display = 'block';
-        this.fileInfo.style.display = 'none';
-        this.resultSection.style.display = 'none';
-        this.errorSection.style.display = 'none';
-        this.loading.style.display = 'none';
-    }
-
-    resetToUpload() {
-        this.errorSection.style.display = 'none';
-        if (this.selectedFile) {
-            this.fileInfo.style.display = 'block';
-        } else {
-            this.uploadArea.style.display = 'block';
-        }
-    }
-
-    // Markdown formatting
     formatMarkdown(text) {
-        let formattedText = text
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/^### (.+$)/gm, '<h3>$1</h3>')
-            .replace(/^## (.+$)/gm, '<h2>$1</h2>')
-            .replace(/^# (.+$)/gm, '<h1>$1</h1>')
-            .replace(/^- (.+$)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n\n/g, '</p><p>')
-            .replace(/^(?!<[h|u|l])(.+$)/gm, '<p>$1</p>')
-            .replace(/<p><\/p>/g, '')
-            .replace(/<p>(<h[1-6]>)/g, '$1')
-            .replace(/(<\/h[1-6]>)<\/p>/g, '$1');
-        
-        // Add clickable title functionality
-        formattedText = formattedText.replace(
-            /<strong>Título:<\/strong>\s*(.+?)(?=<\/p>|<br>|$)/g,
-            '<strong>Título:</strong> <span class="clickable-title" onclick="copyTitleToClipboard(this)" title="Clique para copiar o título">$1</span>'
-        );
-        
-        return formattedText;
+            .replace(/\n/g, '<br>')
+            .replace(/^/, '<p>')
+            .replace(/$/, '</p>');
     }
 
     // Export functions
@@ -323,363 +411,185 @@ class PDFProcessor {
         try {
             await navigator.clipboard.writeText(this.currentSummary);
             this.showToast('Resumo copiado para a área de transferência!');
-        } catch (error) {
-            console.error('Erro ao copiar:', error);
-            this.showToast('Erro ao copiar. Tente selecionar e copiar manualmente.', 'error');
+        } catch (err) {
+            console.error('Erro ao copiar:', err);
+            this.showToast('Erro ao copiar o texto.', 'error');
         }
     }
 
-    exportToPdf() {
-        if (typeof window.jsPDF === 'undefined') {
-            this.loadJsPDF(() => this.generatePdf());
-        } else {
+    async exportToPdf() {
+        try {
+            await this.loadJsPDF();
             this.generatePdf();
+        } catch (error) {
+            console.error('Erro ao exportar PDF:', error);
+            this.showToast('Erro ao exportar PDF.', 'error');
         }
     }
 
-    loadJsPDF(callback) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        script.onload = callback;
-        script.onerror = () => this.showToast('Erro ao carregar biblioteca PDF', 'error');
-        document.head.appendChild(script);
+    async loadJsPDF() {
+        if (typeof window.jsPDF !== 'undefined') {
+            return;
+        }
+        
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
 
     generatePdf() {
-        try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            doc.setFontSize(16);
-            doc.text('Resumo do Documento', 20, 20);
-            
-            doc.setFontSize(12);
-            doc.text(`Arquivo: ${this.currentFilename}`, 20, 35);
-            doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 20, 45);
-            
-            doc.line(20, 50, 190, 50);
-            
-            const lines = doc.splitTextToSize(this.currentSummary, 170);
-            doc.text(lines, 20, 60);
-            
-            doc.save(`resumo-${this.currentFilename.replace('.pdf', '')}.pdf`);
-            this.showToast('PDF gerado com sucesso!');
-        } catch (error) {
-            console.error('Erro ao gerar PDF:', error);
-            this.showToast('Erro ao gerar PDF', 'error');
-        }
+        const { jsPDF } = window.jsPDF;
+        const doc = new jsPDF();
+        
+        const pageWidth = doc.internal.pageSize.width;
+        const margin = 20;
+        const maxWidth = pageWidth - 2 * margin;
+        
+        doc.setFontSize(16);
+        doc.text('Resumo do Documento', margin, 30);
+        
+        doc.setFontSize(12);
+        const lines = doc.splitTextToSize(this.currentSummary, maxWidth);
+        doc.text(lines, margin, 50);
+        
+        const filename = this.currentFilename ? 
+            `resumo_${this.currentFilename.replace('.pdf', '')}.pdf` : 
+            'resumo.pdf';
+        
+        doc.save(filename);
+        this.showToast('PDF exportado com sucesso!');
     }
 
     exportToDocx() {
-        try {
-            // Convert markdown to HTML
-            const htmlContent = this.formatMarkdown(this.currentSummary);
-            
-            // Create a complete HTML document that Word can import properly
-            const htmlDocument = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta charset="utf-8">
-<meta name="ProgId" content="Word.Document">
-<meta name="Generator" content="Microsoft Word 15">
-<meta name="Originator" content="Microsoft Word 15">
-<title>Resumo do Documento</title>
-<!--[if gte mso 9]>
-<xml>
-<w:WordDocument>
-<w:View>Print</w:View>
-<w:Zoom>90</w:Zoom>
-<w:DoNotPromptForConvert/>
-<w:DoNotShowInsertionsAndDeletions/>
-</w:WordDocument>
-</xml>
-<![endif]-->
-<style>
-@page {
-    margin: 2.54cm;
-}
-body {
-    font-family: 'Times New Roman', serif;
-    font-size: 12pt;
-    line-height: 1.5;
-    color: #000;
-}
-h1 {
-    font-size: 18pt;
-    font-weight: bold;
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 20pt;
-}
-h2 {
-    font-size: 16pt;
-    font-weight: bold;
-    color: #34495e;
-    margin-top: 15pt;
-    margin-bottom: 10pt;
-}
-h3 {
-    font-size: 14pt;
-    font-weight: bold;
-    color: #34495e;
-    margin-top: 12pt;
-    margin-bottom: 8pt;
-}
-p {
-    margin-bottom: 10pt;
-    text-align: justify;
-}
-ul, ol {
-    margin-bottom: 10pt;
-}
-li {
-    margin-bottom: 5pt;
-}
-strong {
-    font-weight: bold;
-}
-em {
-    font-style: italic;
-}
-.header {
-    text-align: center;
-    margin-bottom: 30pt;
-    border-bottom: 2pt solid #2c3e50;
-    padding-bottom: 15pt;
-}
-.metadata {
-    margin-bottom: 20pt;
-    padding: 10pt;
-    background-color: #f8f9fa;
-    border-left: 4pt solid #2c3e50;
-}
-</style>
-</head>
-<body>
-<div class="header">
-<h1>RESUMO DO DOCUMENTO</h1>
-</div>
-<div class="metadata">
-<p><strong>Arquivo:</strong> ${this.currentFilename}</p>
-<p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-<p><strong>Gerado por:</strong> EstudAI</p>
-</div>
-<div class="content">
-${htmlContent}
-</div>
-</body>
-</html>`;
-            
-            // Create Blob with HTML MIME type that Word can open
-            const blob = new Blob([htmlDocument], { 
-                type: 'application/msword' 
-            });
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `resumo-${this.currentFilename.replace('.pdf', '')}.doc`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            this.showToast('Documento DOCX gerado com sucesso!');
-        } catch (error) {
-            console.error('Erro ao gerar DOCX:', error);
-            this.showToast('Erro ao gerar documento', 'error');
-        }
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Resumo</title>
+            </head>
+            <body>
+                <h1>Resumo do Documento</h1>
+                <div>${this.formatMarkdown(this.currentSummary)}</div>
+            </body>
+            </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        const filename = this.currentFilename ? 
+            `resumo_${this.currentFilename.replace('.pdf', '')}.doc` : 
+            'resumo.doc';
+        
+        a.href = url;
+        a.download = filename;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        this.showToast('Documento exportado com sucesso!');
     }
 
-    // Citation dropdown
+    // Citation functions
     toggleCitationDropdown() {
         const dropdown = this.exportCitationBtn.parentElement;
         dropdown.classList.toggle('active');
     }
 
-    handleOutsideClick(e) {
-        const dropdown = this.exportCitationBtn?.parentElement;
-        if (dropdown && !dropdown.contains(e.target)) {
-            dropdown.classList.remove('active');
-        }
-    }
-
-    // Extract metadata from summary
-    extractMetadata() {
-        const metadata = {
-            title: 'Não identificado',
-            authors: 'Não identificado',
-            institution: 'Não identificado',
-            location: 'Não identificado',
-            journal: 'Não identificado',
-            volume: 'Não identificado',
-            number: 'Não identificado',
-            year: 'Não identificado',
-            month: 'Não identificado',
-            received: 'Não identificado',
-            accepted: 'Não identificado',
-            pages: 'Não identificado',
-            doi: 'Não identificado',
-            keywords: 'Não identificado'
-        };
-        
-        if (!this.currentSummary) return metadata;
-        
-        const lines = this.currentSummary.split('\n');
-        
-        for (const line of lines) {
-            const cleanLine = line.trim();
-            
-            if (cleanLine.includes('**Título:**')) {
-                metadata.title = cleanLine.replace('**Título:**', '').trim();
-            } else if (cleanLine.includes('**Autores:**')) {
-                metadata.authors = cleanLine.replace('**Autores:**', '').trim();
-            } else if (cleanLine.includes('**Instituição:**')) {
-                metadata.institution = cleanLine.replace('**Instituição:**', '').trim();
-            } else if (cleanLine.includes('**Local:**')) {
-                metadata.location = cleanLine.replace('**Local:**', '').trim();
-            } else if (cleanLine.includes('**Revista/Journal:**')) {
-                metadata.journal = cleanLine.replace('**Revista/Journal:**', '').trim();
-            } else if (cleanLine.includes('**Volume:**')) {
-                metadata.volume = cleanLine.replace('**Volume:**', '').trim();
-            } else if (cleanLine.includes('**Número:**')) {
-                metadata.number = cleanLine.replace('**Número:**', '').trim();
-            } else if (cleanLine.includes('**Ano:**')) {
-                metadata.year = cleanLine.replace('**Ano:**', '').trim();
-            } else if (cleanLine.includes('**Mês:**')) {
-                metadata.month = cleanLine.replace('**Mês:**', '').trim();
-            } else if (cleanLine.includes('**Data de Recebimento:**')) {
-                metadata.received = cleanLine.replace('**Data de Recebimento:**', '').trim();
-            } else if (cleanLine.includes('**Data de Aceitação:**')) {
-                metadata.accepted = cleanLine.replace('**Data de Aceitação:**', '').trim();
-            } else if (cleanLine.includes('**Páginas:**')) {
-                metadata.pages = cleanLine.replace('**Páginas:**', '').trim();
-            } else if (cleanLine.includes('**DOI/ISBN:**')) {
-                metadata.doi = cleanLine.replace('**DOI/ISBN:**', '').trim();
-            } else if (cleanLine.includes('**Palavras-chave:**')) {
-                metadata.keywords = cleanLine.replace('**Palavras-chave:**', '').trim();
-            }
-        }
-        
-        return metadata;
-    }
-
     exportCitation(e, format) {
         e.preventDefault();
         
-        const metadata = this.extractMetadata();
-        const filename = this.currentFilename.replace('.pdf', '');
-        const currentYear = new Date().getFullYear();
-        const date = new Date().toISOString().split('T')[0];
-        
-        // Use extracted metadata or fallback to filename
-        const title = metadata.title !== 'Não identificado' ? metadata.title : filename;
-        const authors = metadata.authors !== 'Não identificado' ? metadata.authors : 'Autor não identificado';
-        const journal = metadata.journal !== 'Não identificado' ? metadata.journal : 'Publicação não identificada';
-        const volume = metadata.volume !== 'Não identificado' ? metadata.volume : '';
-        const number = metadata.number !== 'Não identificado' ? metadata.number : '';
-        const year = metadata.year !== 'Não identificado' ? metadata.year : currentYear;
-        const month = metadata.month !== 'Não identificado' ? metadata.month : '';
-        const received = metadata.received !== 'Não identificado' ? metadata.received : '';
-        const accepted = metadata.accepted !== 'Não identificado' ? metadata.accepted : '';
-        const pages = metadata.pages !== 'Não identificado' ? metadata.pages : '';
-        const doi = metadata.doi !== 'Não identificado' ? metadata.doi : '';
-        const institution = metadata.institution !== 'Não identificado' ? metadata.institution : '';
-        const location = metadata.location !== 'Não identificado' ? metadata.location : '';
+        const currentDate = new Date().toISOString().split('T')[0];
+        const title = this.currentFilename ? 
+            this.currentFilename.replace('.pdf', '') : 
+            'Documento';
         
         let citation = '';
         
-        switch (format) {
-            case 'endnote':
-                citation = `%0 Journal Article\n%T ${title}\n%A ${authors}\n%J ${journal}`;
-                if (volume) citation += `\n%V ${volume}`;
-                if (number) citation += `\n%N ${number}`;
-                citation += `\n%D ${year}`;
-                if (month) citation += `\n%8 ${month}`;
-                if (pages) citation += `\n%P ${pages}`;
-                if (doi) citation += `\n%R ${doi}`;
-                if (institution) citation += `\n%I ${institution}`;
-                if (location) citation += `\n%C ${location}`;
-                if (received) citation += `\n%7 Received: ${received}`;
-                if (accepted) citation += `\n%7 Accepted: ${accepted}`;
-                citation += `\n%X Resumo gerado por EstudAI`;
-                break;
-                 
-            case 'ris':
-                citation = `TY  - JOUR\nTI  - ${title}\nAU  - ${authors}\nJO  - ${journal}`;
-                if (volume) citation += `\nVL  - ${volume}`;
-                if (number) citation += `\nIS  - ${number}`;
-                citation += `\nPY  - ${year}`;
-                if (month) citation += `\nY2  - ${year}/${month}`;
-                if (pages) citation += `\nSP  - ${pages.split('-')[0] || pages}\nEP  - ${pages.split('-')[1] || pages}`;
-                if (doi) citation += `\nDO  - ${doi}`;
-                if (institution) citation += `\nAD  - ${institution}`;
-                if (location) citation += `\nCY  - ${location}`;
-                if (received) citation += `\nN1  - Received: ${received}`;
-                if (accepted) citation += `\nN1  - Accepted: ${accepted}`;
-                citation += `\nN1  - Resumo gerado por EstudAI\nER  -`;
-                break;
+        if (format === 'endnote') {
+            citation = `%0 Generic\n%T ${title}\n%D ${new Date().getFullYear()}\n%8 ${currentDate}\n%X Resumo gerado por IA`;
+        } else if (format === 'ris') {
+            citation = `TY  - GEN\nTI  - ${title}\nPY  - ${new Date().getFullYear()}\nDA  - ${currentDate}\nN1  - Resumo gerado por IA\nER  -`;
         }
         
         const blob = new Blob([citation], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.${format === 'bibtex' ? 'bib' : format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
         
-        this.showToast(`Citação ${format.toUpperCase()} baixada com sucesso!`);
-        this.toggleCitationDropdown();
+        a.href = url;
+        a.download = `citation.${format === 'endnote' ? 'enw' : 'ris'}`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        this.showToast(`Citação ${format.toUpperCase()} exportada com sucesso!`);
+        
+        // Close dropdown
+        const dropdown = this.exportCitationBtn.parentElement;
+        dropdown.classList.remove('active');
     }
 
-    // Authentication methods
+    // Navigation functions
+    resetApp() {
+        this.selectedFile = null;
+        this.currentSummary = '';
+        this.currentFilename = '';
+        
+        this.fileInfo.style.display = 'none';
+        this.uploadArea.style.display = 'block';
+        this.resultSection.style.display = 'none';
+        this.errorSection.style.display = 'none';
+        this.loading.style.display = 'none';
+        
+        this.fileInput.value = '';
+        this.initializeDefaultSelection();
+    }
+
+    resetToUpload() {
+        this.errorSection.style.display = 'none';
+        this.loading.style.display = 'none';
+        this.fileInfo.style.display = 'block';
+    }
+
+    // Authentication
     async checkAuthStatus() {
         try {
             const response = await fetch('/auth/status');
             const data = await response.json();
             
-            if (!data.authenticated) {
-                // Usuário não está logado, redirecionar para login
-                window.location.href = '/login';
-                return;
-            }
-            
-            // Atualizar informações do usuário
-            if (this.userName) {
-                this.userName.textContent = `Olá, ${data.user.name}`;
+            if (data.authenticated) {
+                this.userName.textContent = data.user.name;
+            } else {
+                window.location.href = '/login.html';
             }
         } catch (error) {
             console.error('Erro ao verificar autenticação:', error);
-            window.location.href = '/login';
+            window.location.href = '/login.html';
         }
     }
 
     async handleLogout() {
         try {
-            const response = await fetch('/logout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                window.location.href = '/login';
-            } else {
-                this.showToast('Erro ao fazer logout. Tente novamente.', 'error');
-            }
+            await fetch('/auth/logout', { method: 'POST' });
+            window.location.href = '/login.html';
         } catch (error) {
-            console.error('Erro no logout:', error);
-            this.showToast('Erro de conexão. Tente novamente.', 'error');
+            console.error('Erro ao fazer logout:', error);
         }
     }
 
-    // Toast notifications
+    // Utility functions
+    handleOutsideClick(e) {
+        if (!e.target.closest('.dropdown')) {
+            document.querySelectorAll('.dropdown').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        }
+    }
+
     showToast(message, type = 'success') {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
@@ -691,74 +601,44 @@ ${htmlContent}
             right: 20px;
             background: ${type === 'success' ? '#27ae60' : '#e74c3c'};
             color: white;
-            padding: 15px 20px;
+            padding: 12px 24px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
+            z-index: 10000;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         `;
         
         document.body.appendChild(toast);
         
         setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => {
-                if (document.body.contains(toast)) {
-                    document.body.removeChild(toast);
-                }
-            }, 300);
+            toast.remove();
         }, 3000);
     }
 }
 
-// CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
-
-// Global function for copying title to clipboard
-window.copyTitleToClipboard = function(element) {
-    const titleText = element.textContent.trim();
-    navigator.clipboard.writeText(titleText).then(() => {
-        // Find the PDFProcessor instance to show toast
-        if (window.pdfProcessorInstance) {
-            window.pdfProcessorInstance.showToast('Título copiado para a área de transferência!');
-        }
-    }).catch(error => {
-        console.error('Erro ao copiar título:', error);
-        if (window.pdfProcessorInstance) {
-            window.pdfProcessorInstance.showToast('Erro ao copiar título', 'error');
-        }
-    });
-};
-
-// Initialize app
+// Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        window.pdfProcessorInstance = new PDFProcessor();
-    } catch (error) {
-        console.error('Erro ao inicializar PDFProcessor:', error);
+    new PDFProcessor();
+});
+
+// Modify the fetch request in your PDF processing function
+fetch('/process-pdf', {
+    method: 'POST',
+    body: formData
+})
+.then(response => {
+    if (response.status === 429) {
+        return response.json().then(data => {
+            throw new Error(`Limite diário atingido. ${data.resetTime ? 'Reset em: ' + new Date(data.resetTime).toLocaleString() : 'Tente novamente mais tarde.'}`);
+        });
     }
+    return response.json();
+})
+.then(data => {
+    // ... existing success handling ...
+})
+.catch(error => {
+    console.error('Erro:', error);
+    showToast(error.message || 'Erro ao processar PDF', 'error');
+    // ... existing error handling ...
 });
